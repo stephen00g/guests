@@ -17,4 +17,12 @@ spec:
           image: nginx:latest
           ports:
             - containerPort: 80
+          volumeMounts:
+            - name: welcome-page
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+      volumes:
+        - name: welcome-page
+          configMap:
+            name: nginx-demo-welcome
 

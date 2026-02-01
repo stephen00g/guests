@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-demo-welcome
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Welcome</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: system-ui, -apple-system, sans-serif;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+          color: #e8e8e8;
+        }
+        .card {
+          text-align: center;
+          padding: 3rem;
+          max-width: 32rem;
+          background: rgba(255,255,255,0.06);
+          border-radius: 1rem;
+          border: 1px solid rgba(255,255,255,0.1);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        h1 {
+          font-size: 2rem;
+          font-weight: 600;
+          margin-bottom: 0.75rem;
+          background: linear-gradient(90deg, #e94560, #ff6b6b);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        p {
+          color: #b8b8b8;
+          line-height: 1.6;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <h1>Welcome</h1>
+        <p>You've reached the nginx-demo. Edit <code>welcome.html</code> and re-apply the ConfigMap to change this page.</p>
+      </div>
+    </body>
+    </html>
