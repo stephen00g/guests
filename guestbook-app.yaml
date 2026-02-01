@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/kubernetes/examples
-    targetRevision: master
+    targetRevision: main
     path: guestbook
   destination:
     server: https://kubernetes.default.svc
