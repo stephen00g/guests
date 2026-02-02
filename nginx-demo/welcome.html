@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome</title>
+  <title>Stephen Godfrey — Welcome</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -18,7 +18,7 @@
     .card {
       text-align: center;
       padding: 3rem;
-      max-width: 32rem;
+      max-width: 36rem;
       background: rgba(255,255,255,0.06);
       border-radius: 1rem;
       border: 1px solid rgba(255,255,255,0.1);
@@ -27,22 +27,71 @@
     h1 {
       font-size: 2rem;
       font-weight: 600;
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.25rem;
       background: linear-gradient(90deg, #e94560, #ff6b6b);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
+    .title {
+      color: #b8b8b8;
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+    }
+    .location {
+      color: #888;
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
     p {
       color: #b8b8b8;
       line-height: 1.6;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+    }
+    .links a {
+      color: #e94560;
+      text-decoration: none;
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(233, 69, 96, 0.4);
+      transition: background 0.2s, color 0.2s;
+    }
+    .links a:hover {
+      background: rgba(233, 69, 96, 0.2);
+      color: #ff6b6b;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Welcome</h1>
-    <p>You've reached the nginx-demo. Edit <code>welcome.html</code> and re-apply the ConfigMap to change this page.</p>
+    <h1>Stephen Godfrey</h1>
+    <p class="title">Technical Product Manager · Data Science</p>
+    <p class="location">Palo Alto, CA</p>
+    <p>
+      Product manager and data science practitioner with a proven track record of building quantitative models, 
+      employing analytics to inform strategic decisions, and driving new initiatives to successful outcomes. 
+      Background at PayPal, Veem, Wells Fargo, and Bank of America Merrill Lynch—leading eCommerce and FX teams 
+      and delivering global payments, APIs, and ML tools.
+    </p>
+    <p>
+      Also runs <strong>Mountain Fresh Media</strong>—building websites and webapps, full-stack development, 
+      and AWS. Father, consultant, developer.
+    </p>
+    <div class="links">
+      <a href="https://stephengodfrey.net/" target="_blank" rel="noopener">Website</a>
+      <a href="https://github.com/sgodfrey66" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/stephen-godfrey/" target="_blank" rel="noopener">LinkedIn</a>
+      <a href="https://mountainfreshmedia.com/" target="_blank" rel="noopener">Mountain Fresh Media</a>
+    </div>
   </div>
 </body>
 </html>
