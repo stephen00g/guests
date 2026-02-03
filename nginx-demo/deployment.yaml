@@ -12,6 +12,7 @@ spec:
       labels:
         app: nginx-demo
     spec:
+      serviceAccountName: nginx-demo
       containers:
         - name: php
           image: php:8.2-apache
