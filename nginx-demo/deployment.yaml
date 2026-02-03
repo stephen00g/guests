@@ -13,13 +13,13 @@ spec:
         app: nginx-demo
     spec:
       containers:
-        - name: nginx
-          image: nginx:latest
+        - name: php
+          image: php:8.2-apache
           ports:
             - containerPort: 80
           volumeMounts:
             - name: welcome-page
-              mountPath: /usr/share/nginx/html
+              mountPath: /var/www/html
               readOnly: true
       volumes:
         - name: welcome-page

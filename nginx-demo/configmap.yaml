@@ -3,13 +3,14 @@ kind: ConfigMap
 metadata:
   name: nginx-demo-welcome
 data:
-  index.html: |
+  index.php: |
+    <?php date_default_timezone_set('America/Los_Angeles'); ?>
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Stephen JamesGodfrey — Welcome</title>
+      <title>Stephen Godfrey — Welcome</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -20,6 +21,14 @@ data:
           justify-content: center;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
           color: #e8e8e8;
+        }
+        .datetime {
+          position: fixed;
+          top: 1rem;
+          right: 1rem;
+          color: rgba(255,255,255,0.7);
+          font-size: 0.9rem;
+          font-variant-numeric: tabular-nums;
         }
         .card {
           text-align: center;
@@ -78,8 +87,9 @@ data:
       </style>
     </head>
     <body>
+      <div class="datetime"><?php echo date('l, F j, Y g:i A T'); ?></div>
       <div class="card">
-        <h1>Stephen James Godfrey</h1>
+        <h1>Stephen Godfrey</h1>
         <p class="title">Technical Product Manager · Data Science</p>
         <p class="location">Palo Alto, CA</p>
         <p>
