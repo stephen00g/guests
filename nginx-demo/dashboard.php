@@ -160,29 +160,58 @@ function podAge($pod) {
     }
     .stat-card .value { font-size: 1.5rem; font-weight: 600; color: #5794f2; }
     .stat-card .label { color: #9d9d9d; font-size: 0.75rem; margin-top: 0.25rem; }
+    .live-indicator { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: #73bf69; margin-left: auto; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #73bf69; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .charts-row { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    .chart-wrap { position: relative; height: 200px; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="navbar">
     <h1>Cluster Dashboard</h1>
     <span class="badge">Kubernetes</span>
+    <span class="live-indicator" id="live-indicator"><span class="live-dot"></span> Live</span>
   </div>
   <div class="container">
     <?php if ($error): ?>
       <div class="error-box"><?php echo htmlspecialchars($error); ?></div>
     <?php else: ?>
-      <div class="stats-row">
+      <div class="stats-row" id="stats-row">
         <div class="stat-card">
-          <div class="value"><?php echo count($nodes); ?></div>
+          <div class="value" data-live="nodes"><?php echo count($nodes); ?></div>
           <div class="label">Nodes</div>
         </div>
         <div class="stat-card">
-          <div class="value"><?php echo count($pods); ?></div>
+          <div class="value" data-live="pods"><?php echo count($pods); ?></div>
           <div class="label">Pods</div>
         </div>
         <div class="stat-card">
-          <div class="value"><?php echo count(array_filter($pods, fn($p) => ($p['status']['phase'] ?? '') === 'Running')); ?></div>
+          <div class="value" data-live="running"><?php echo count(array_filter($pods, fn($p) => ($p['status']['phase'] ?? '') === 'Running')); ?></div>
           <div class="label">Running</div>
+        </div>
+        <div class="stat-card" id="stat-cpu" style="display:none">
+          <div class="value" data-live="cpu">—</div>
+          <div class="label">CPU (cores)</div>
+        </div>
+        <div class="stat-card" id="stat-memory" style="display:none">
+          <div class="value" data-live="memory">—</div>
+          <div class="label">Memory (Mi)</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Live metrics</div>
+        <div class="panel-body" style="padding:1rem">
+          <div class="charts-row">
+            <div class="chart-wrap">
+              <canvas id="chart-counts"></canvas>
+            </div>
+            <div class="chart-wrap" id="chart-metrics-wrap" style="display:none">
+              <canvas id="chart-metrics"></canvas>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -261,5 +290,98 @@ function podAge($pod) {
       </div>
     <?php endif; ?>
   </div>
+  <?php if (!$error): ?>
+  <script>
+  (function() {
+    var chartCounts = null;
+    var chartMetrics = null;
+    var pollInterval = 2000;
+
+    function updateStats(data) {
+      ['nodes','pods','running'].forEach(function(k) {
+        var el = document.querySelector('[data-live="' + k + '"]');
+        if (el && data[k] !== undefined) el.textContent = data[k];
+      });
+      if (data.cpu != null) {
+        var cpuEl = document.querySelector('[data-live="cpu"]');
+        var cpuCard = document.getElementById('stat-cpu');
+        if (cpuEl && cpuCard) { cpuEl.textContent = data.cpu.toFixed(2); cpuCard.style.display = ''; }
+      }
+      if (data.memory != null) {
+        var memEl = document.querySelector('[data-live="memory"]');
+        var memCard = document.getElementById('stat-memory');
+        if (memEl && memCard) { memEl.textContent = data.memory; memCard.style.display = ''; }
+      }
+    }
+
+    function initCharts(history) {
+      if (!history || history.length === 0) return;
+      var labels = history.map(function(h) { return new Date(h.t * 1000).toLocaleTimeString(); });
+      var opts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#9d9d9d' } } },
+        scales: {
+          x: { ticks: { color: '#6d6d6d', maxTicksLimit: 8 } },
+          y: { ticks: { color: '#6d6d6d' } }
+        }
+      };
+      if (!chartCounts) {
+        chartCounts = new Chart(document.getElementById('chart-counts'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              { label: 'Pods', data: history.map(function(h) { return h.pods; }), borderColor: '#5794f2', backgroundColor: 'rgba(87,148,242,0.1)', fill: true, tension: 0.3 },
+              { label: 'Running', data: history.map(function(h) { return h.running; }), borderColor: '#73bf69', backgroundColor: 'rgba(115,191,105,0.1)', fill: true, tension: 0.3 },
+              { label: 'Nodes', data: history.map(function(h) { return h.nodes; }), borderColor: '#e0b000', backgroundColor: 'rgba(224,176,0,0.05)', fill: true, tension: 0.3 }
+            ]
+          },
+          options: opts
+        });
+      } else {
+        chartCounts.data.labels = labels;
+        chartCounts.data.datasets[0].data = history.map(function(h) { return h.pods; });
+        chartCounts.data.datasets[1].data = history.map(function(h) { return h.running; });
+        chartCounts.data.datasets[2].data = history.map(function(h) { return h.nodes; });
+        chartCounts.update('none');
+      }
+      var hasMetrics = history.some(function(h) { return h.cpu != null || h.memory != null; });
+      if (hasMetrics && history[0].cpu != null) {
+        var wrap = document.getElementById('chart-metrics-wrap');
+        if (wrap) wrap.style.display = '';
+        if (!chartMetrics) {
+          chartMetrics = new Chart(document.getElementById('chart-metrics'), {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                { label: 'CPU (cores)', data: history.map(function(h) { return h.cpu != null ? h.cpu : null; }), borderColor: '#e02f44', backgroundColor: 'rgba(224,47,68,0.1)', fill: true, tension: 0.3 },
+                { label: 'Memory (Mi)', data: history.map(function(h) { return h.memory != null ? h.memory : null; }), borderColor: '#5794f2', backgroundColor: 'rgba(87,148,242,0.1)', fill: true, tension: 0.3 }
+              ]
+            },
+            options: opts
+          });
+        } else {
+          chartMetrics.data.labels = labels;
+          chartMetrics.data.datasets[0].data = history.map(function(h) { return h.cpu != null ? h.cpu : null; });
+          chartMetrics.data.datasets[1].data = history.map(function(h) { return h.memory != null ? h.memory : null; });
+          chartMetrics.update('none');
+        }
+      }
+    }
+
+    function poll() {
+      fetch('data.php').then(function(r) { return r.json(); }).then(function(data) {
+        updateStats(data);
+        if (data.history && data.history.length) initCharts(data.history);
+      }).catch(function() {});
+    }
+
+    poll();
+    setInterval(poll, pollInterval);
+  })();
+  </script>
+  <?php endif; ?>
 </body>
 </html>
