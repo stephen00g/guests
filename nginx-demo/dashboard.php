@@ -173,6 +173,30 @@ function podAge($pod) {
     .panel-header .icon-wrap { display: inline-flex; align-items: center; gap: 0.4rem; }
     .panel-header .icon-wrap svg { width: 18px; height: 18px; opacity: 0.9; }
     .storage-note { color: #9d9d9d; font-size: 0.8rem; margin-top: 0.5rem; }
+    .cell-bar { position: relative; padding: 0; min-width: 80px; }
+    .cell-bar .bar-wrap {
+      position: relative;
+      display: block;
+      height: 1.6rem;
+      line-height: 1.6rem;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .cell-bar .bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      border-radius: 4px;
+      opacity: 0.35;
+      min-width: 4px;
+    }
+    .cell-bar .bar-value {
+      position: relative;
+      z-index: 1;
+      padding: 0 0.4rem;
+      font-variant-numeric: tabular-nums;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
@@ -218,16 +242,11 @@ function podAge($pod) {
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-header">Live metrics</div>
+      <div class="panel" id="panel-live-metrics" style="display:none">
+        <div class="panel-header">Live metrics (normalized 0–100% in time window)</div>
         <div class="panel-body" style="padding:1rem">
-          <div class="charts-row">
-            <div class="chart-wrap">
-              <canvas id="chart-counts"></canvas>
-            </div>
-            <div class="chart-wrap" id="chart-metrics-wrap" style="display:none">
-              <canvas id="chart-metrics"></canvas>
-            </div>
+          <div class="chart-wrap" id="chart-metrics-wrap">
+            <canvas id="chart-metrics"></canvas>
           </div>
         </div>
       </div>
@@ -340,7 +359,6 @@ function podAge($pod) {
   <?php if (!$error): ?>
   <script>
   (function() {
-    var chartCounts = null;
     var chartMetrics = null;
     var pollInterval = 2000;
 
@@ -370,10 +388,32 @@ function podAge($pod) {
       if (topCpu.length || topMem.length) {
         var panel = document.getElementById('panel-top-consumers');
         if (panel) panel.style.display = '';
+        function heatColor(pct) {
+          if (pct <= 0) return 'rgb(115, 191, 105)';
+          if (pct >= 1) return 'rgb(224, 47, 68)';
+          if (pct < 0.5) {
+            var t = pct * 2;
+            return 'rgb(' + Math.round(115 + (224 - 115) * t) + ',' + Math.round(191 + (47 - 191) * t) + ',' + Math.round(105 + (68 - 105) * t) + ')';
+          }
+          var t = (pct - 0.5) * 2;
+          return 'rgb(' + Math.round(224) + ',' + Math.round(176 + (47 - 176) * t) + ',' + Math.round(0 + (68 - 0) * t) + ')';
+        }
+        var maxCpu = topCpu.length ? Math.max.apply(null, topCpu.map(function(p) { return p.cpu; })) : 1;
+        var maxMem = topMem.length ? Math.max.apply(null, topMem.map(function(p) { return p.memory_mi; })) : 1;
+        if (maxCpu <= 0) maxCpu = 1;
+        if (maxMem <= 0) maxMem = 1;
         var cpuTbody = document.getElementById('top-cpu-tbody');
-        if (cpuTbody) cpuTbody.innerHTML = topCpu.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.cpu + '</td></tr>'; }).join('');
+        if (cpuTbody) cpuTbody.innerHTML = topCpu.slice(0, 10).map(function(p) {
+          var pct = maxCpu > 0 ? Math.min(1, p.cpu / maxCpu) : 0;
+          var color = heatColor(pct);
+          return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + p.cpu + '</span></span></td></tr>';
+        }).join('');
         var memTbody = document.getElementById('top-memory-tbody');
-        if (memTbody) memTbody.innerHTML = topMem.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.memory_mi + '</td></tr>'; }).join('');
+        if (memTbody) memTbody.innerHTML = topMem.slice(0, 10).map(function(p) {
+          var pct = maxMem > 0 ? Math.min(1, p.memory_mi / maxMem) : 0;
+          var color = heatColor(pct);
+          return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + p.memory_mi + '</span></span></td></tr>';
+        }).join('');
       }
       var topStorage = data.top_storage_pods || [];
       var storageTable = document.getElementById('storage-table');
@@ -384,62 +424,58 @@ function podAge($pod) {
       }
     }
 
+    function normSeries(arr) {
+      var valid = arr.filter(function(v) { return v != null && isFinite(v); });
+      if (valid.length === 0) return arr.map(function() { return null; });
+      var min = Math.min.apply(null, valid);
+      var max = Math.max.apply(null, valid);
+      var range = max - min;
+      if (range === 0) return arr.map(function(v) { return v != null ? 50 : null; });
+      return arr.map(function(v) { return v != null ? Math.round((v - min) / range * 100) : null; });
+    }
     function initCharts(history) {
       if (!history || history.length === 0) return;
+      var hasMetrics = history.some(function(h) { return h.cpu != null || h.memory != null || h.max_pod_cpu != null || h.max_pod_memory != null; });
+      if (!hasMetrics) return;
+      var panel = document.getElementById('panel-live-metrics');
+      if (panel) panel.style.display = '';
       var labels = history.map(function(h) { return new Date(h.t * 1000).toLocaleTimeString(); });
+      var rawCpu = history.map(function(h) { return h.cpu != null ? h.cpu : null; });
+      var rawMem = history.map(function(h) { return h.memory != null ? h.memory : null; });
+      var rawMaxCpu = history.map(function(h) { return h.max_pod_cpu != null ? h.max_pod_cpu : null; });
+      var rawMaxMem = history.map(function(h) { return h.max_pod_memory != null ? h.max_pod_memory : null; });
       var opts = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { labels: { color: '#9d9d9d' } } },
         scales: {
           x: { ticks: { color: '#6d6d6d', maxTicksLimit: 8 } },
-          y: { ticks: { color: '#6d6d6d' } }
+          y: {
+            min: 0,
+            max: 100,
+            ticks: { color: '#6d6d6d', callback: function(v) { return v + '%'; } }
+          }
         }
       };
-      if (!chartCounts) {
-        chartCounts = new Chart(document.getElementById('chart-counts'), {
+      var ds = [
+        { label: 'Cluster CPU (%)', data: normSeries(rawCpu), borderColor: '#e02f44', backgroundColor: 'rgba(224,47,68,0.1)', fill: true, tension: 0.3 },
+        { label: 'Cluster Memory (%)', data: normSeries(rawMem), borderColor: '#5794f2', backgroundColor: 'rgba(87,148,242,0.1)', fill: true, tension: 0.3 },
+        { label: 'Max pod CPU (%)', data: normSeries(rawMaxCpu), borderColor: '#ff6b6b', backgroundColor: 'rgba(255,107,107,0.05)', fill: true, tension: 0.3, borderDash: [4,2] },
+        { label: 'Max pod Memory (%)', data: normSeries(rawMaxMem), borderColor: '#73bf69', backgroundColor: 'rgba(115,191,105,0.05)', fill: true, tension: 0.3, borderDash: [4,2] }
+      ];
+      if (!chartMetrics) {
+        chartMetrics = new Chart(document.getElementById('chart-metrics'), {
           type: 'line',
-          data: {
-            labels: labels,
-            datasets: [
-              { label: 'Pods', data: history.map(function(h) { return h.pods; }), borderColor: '#5794f2', backgroundColor: 'rgba(87,148,242,0.1)', fill: true, tension: 0.3 },
-              { label: 'Running', data: history.map(function(h) { return h.running; }), borderColor: '#73bf69', backgroundColor: 'rgba(115,191,105,0.1)', fill: true, tension: 0.3 },
-              { label: 'Nodes', data: history.map(function(h) { return h.nodes; }), borderColor: '#e0b000', backgroundColor: 'rgba(224,176,0,0.05)', fill: true, tension: 0.3 }
-            ]
-          },
+          data: { labels: labels, datasets: ds },
           options: opts
         });
       } else {
-        chartCounts.data.labels = labels;
-        chartCounts.data.datasets[0].data = history.map(function(h) { return h.pods; });
-        chartCounts.data.datasets[1].data = history.map(function(h) { return h.running; });
-        chartCounts.data.datasets[2].data = history.map(function(h) { return h.nodes; });
-        chartCounts.update('none');
-      }
-      var hasMetrics = history.some(function(h) { return h.cpu != null || h.memory != null || h.max_pod_cpu != null || h.max_pod_memory != null; });
-      if (hasMetrics) {
-        var wrap = document.getElementById('chart-metrics-wrap');
-        if (wrap) wrap.style.display = '';
-        var ds = [
-          { label: 'Cluster CPU', data: history.map(function(h) { return h.cpu != null ? h.cpu : null; }), borderColor: '#e02f44', backgroundColor: 'rgba(224,47,68,0.1)', fill: true, tension: 0.3 },
-          { label: 'Cluster Memory (Mi)', data: history.map(function(h) { return h.memory != null ? h.memory : null; }), borderColor: '#5794f2', backgroundColor: 'rgba(87,148,242,0.1)', fill: true, tension: 0.3 },
-          { label: 'Max pod CPU', data: history.map(function(h) { return h.max_pod_cpu != null ? h.max_pod_cpu : null; }), borderColor: '#ff6b6b', backgroundColor: 'rgba(255,107,107,0.05)', fill: true, tension: 0.3, borderDash: [4,2] },
-          { label: 'Max pod Memory (Mi)', data: history.map(function(h) { return h.max_pod_memory != null ? h.max_pod_memory : null; }), borderColor: '#73bf69', backgroundColor: 'rgba(115,191,105,0.05)', fill: true, tension: 0.3, borderDash: [4,2] }
-        ];
-        if (!chartMetrics) {
-          chartMetrics = new Chart(document.getElementById('chart-metrics'), {
-            type: 'line',
-            data: { labels: labels, datasets: ds },
-            options: opts
-          });
-        } else {
-          chartMetrics.data.labels = labels;
-          chartMetrics.data.datasets[0].data = history.map(function(h) { return h.cpu != null ? h.cpu : null; });
-          chartMetrics.data.datasets[1].data = history.map(function(h) { return h.memory != null ? h.memory : null; });
-          chartMetrics.data.datasets[2].data = history.map(function(h) { return h.max_pod_cpu != null ? h.max_pod_cpu : null; });
-          chartMetrics.data.datasets[3].data = history.map(function(h) { return h.max_pod_memory != null ? h.max_pod_memory : null; });
-          chartMetrics.update('none');
-        }
+        chartMetrics.data.labels = labels;
+        chartMetrics.data.datasets[0].data = normSeries(rawCpu);
+        chartMetrics.data.datasets[1].data = normSeries(rawMem);
+        chartMetrics.data.datasets[2].data = normSeries(rawMaxCpu);
+        chartMetrics.data.datasets[3].data = normSeries(rawMaxMem);
+        chartMetrics.update('none');
       }
     }
 
