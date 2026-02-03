@@ -158,6 +158,9 @@ function podAge($pod) {
       padding: 1rem 1.25rem;
       min-width: 140px;
     }
+    .stat-card { display: flex; align-items: flex-start; gap: 0.6rem; }
+    .stat-card .icon-wrap { flex-shrink: 0; margin-top: 0.15rem; }
+    .stat-card .icon-wrap svg { width: 20px; height: 20px; opacity: 0.9; }
     .stat-card .value { font-size: 1.5rem; font-weight: 600; color: #5794f2; }
     .stat-card .label { color: #9d9d9d; font-size: 0.75rem; margin-top: 0.25rem; }
     .live-indicator { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: #73bf69; margin-left: auto; }
@@ -165,8 +168,18 @@ function podAge($pod) {
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
     .charts-row { display: grid; grid-template-columns: 1fr; gap: 1rem; }
     .chart-wrap { position: relative; height: 200px; }
+    .top-consumers { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 800px) { .top-consumers { grid-template-columns: 1fr; } }
+    .panel-header .icon-wrap { display: inline-flex; align-items: center; gap: 0.4rem; }
+    .panel-header .icon-wrap svg { width: 18px; height: 18px; opacity: 0.9; }
+    .storage-note { color: #9d9d9d; font-size: 0.8rem; margin-top: 0.5rem; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
+    <symbol id="icon-cpu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
+    <symbol id="icon-mem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/><path d="M6 8h4M6 12h4M14 8h4M14 12h4"/></symbol>
+    <symbol id="icon-drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M2 12h4M18 12h4M12 2v4M12 18v4"/></symbol>
+  </svg>
 </head>
 <body>
   <div class="navbar">
@@ -180,24 +193,28 @@ function podAge($pod) {
     <?php else: ?>
       <div class="stats-row" id="stats-row">
         <div class="stat-card">
-          <div class="value" data-live="nodes"><?php echo count($nodes); ?></div>
-          <div class="label">Nodes</div>
+          <span class="icon-wrap" style="color:#e0b000"><svg><use href="#icon-cpu"/></svg></span>
+          <div><div class="value" data-live="nodes"><?php echo count($nodes); ?></div><div class="label">Nodes</div></div>
         </div>
         <div class="stat-card">
-          <div class="value" data-live="pods"><?php echo count($pods); ?></div>
-          <div class="label">Pods</div>
+          <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span>
+          <div><div class="value" data-live="pods"><?php echo count($pods); ?></div><div class="label">Pods</div></div>
         </div>
         <div class="stat-card">
-          <div class="value" data-live="running"><?php echo count(array_filter($pods, fn($p) => ($p['status']['phase'] ?? '') === 'Running')); ?></div>
-          <div class="label">Running</div>
+          <span class="icon-wrap" style="color:#73bf69"><svg><use href="#icon-mem"/></svg></span>
+          <div><div class="value" data-live="running"><?php echo count(array_filter($pods, fn($p) => ($p['status']['phase'] ?? '') === 'Running')); ?></div><div class="label">Running</div></div>
         </div>
         <div class="stat-card" id="stat-cpu" style="display:none">
-          <div class="value" data-live="cpu">—</div>
-          <div class="label">CPU (cores)</div>
+          <span class="icon-wrap" style="color:#e02f44"><svg><use href="#icon-cpu"/></svg></span>
+          <div><div class="value" data-live="cpu">—</div><div class="label">CPU (cores)</div></div>
         </div>
         <div class="stat-card" id="stat-memory" style="display:none">
-          <div class="value" data-live="memory">—</div>
-          <div class="label">Memory (Mi)</div>
+          <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span>
+          <div><div class="value" data-live="memory">—</div><div class="label">Memory (Mi)</div></div>
+        </div>
+        <div class="stat-card" id="stat-storage" style="display:none">
+          <span class="icon-wrap" style="color:#9d9d9d"><svg><use href="#icon-drive"/></svg></span>
+          <div><div class="value" data-live="storage">—</div><div class="label">Storage (Mi)</div></div>
         </div>
       </div>
 
@@ -211,6 +228,36 @@ function podAge($pod) {
             <div class="chart-wrap" id="chart-metrics-wrap" style="display:none">
               <canvas id="chart-metrics"></canvas>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-top-consumers" style="display:none">
+        <div class="panel-header">Top consumers</div>
+        <div class="panel-body" style="padding:1rem">
+          <div class="top-consumers">
+            <div>
+              <div class="panel-header" style="border-bottom:0;padding:0 0 0.5rem 0">
+                <span class="icon-wrap" style="color:#e02f44"><svg><use href="#icon-cpu"/></svg></span> Top CPU (pods)
+              </div>
+              <table><thead><tr><th>Pod</th><th>Namespace</th><th>CPU</th></tr></thead><tbody id="top-cpu-tbody"></tbody></table>
+            </div>
+            <div>
+              <div class="panel-header" style="border-bottom:0;padding:0 0 0.5rem 0">
+                <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span> Top Memory (pods)
+              </div>
+              <table><thead><tr><th>Pod</th><th>Namespace</th><th>Mi</th></tr></thead><tbody id="top-memory-tbody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="icon-wrap" style="color:#9d9d9d"><svg><use href="#icon-drive"/></svg></span> Storage</div>
+        <div class="panel-body" style="padding:1rem">
+          <div id="storage-content">
+            <p class="storage-note">Ephemeral storage usage (when reported by metrics-server). Disk read/write speed requires Prometheus and node_exporter.</p>
+            <table id="storage-table" style="display:none"><thead><tr><th>Pod</th><th>Namespace</th><th>Mi</th></tr></thead><tbody id="top-storage-tbody"></tbody></table>
           </div>
         </div>
       </div>
@@ -297,6 +344,7 @@ function podAge($pod) {
     var chartMetrics = null;
     var pollInterval = 2000;
 
+    function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function updateStats(data) {
       ['nodes','pods','running'].forEach(function(k) {
         var el = document.querySelector('[data-live="' + k + '"]');
@@ -311,6 +359,28 @@ function podAge($pod) {
         var memEl = document.querySelector('[data-live="memory"]');
         var memCard = document.getElementById('stat-memory');
         if (memEl && memCard) { memEl.textContent = data.memory; memCard.style.display = ''; }
+      }
+      if (data.storage_mi != null) {
+        var stEl = document.querySelector('[data-live="storage"]');
+        var stCard = document.getElementById('stat-storage');
+        if (stEl && stCard) { stEl.textContent = data.storage_mi; stCard.style.display = ''; }
+      }
+      var topCpu = data.top_cpu_pods || [];
+      var topMem = data.top_memory_pods || [];
+      if (topCpu.length || topMem.length) {
+        var panel = document.getElementById('panel-top-consumers');
+        if (panel) panel.style.display = '';
+        var cpuTbody = document.getElementById('top-cpu-tbody');
+        if (cpuTbody) cpuTbody.innerHTML = topCpu.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.cpu + '</td></tr>'; }).join('');
+        var memTbody = document.getElementById('top-memory-tbody');
+        if (memTbody) memTbody.innerHTML = topMem.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.memory_mi + '</td></tr>'; }).join('');
+      }
+      var topStorage = data.top_storage_pods || [];
+      var storageTable = document.getElementById('storage-table');
+      var storageTbody = document.getElementById('top-storage-tbody');
+      if (topStorage.length && storageTable && storageTbody) {
+        storageTable.style.display = '';
+        storageTbody.innerHTML = topStorage.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.storage_mi + '</td></tr>'; }).join('');
       }
     }
 
@@ -346,26 +416,28 @@ function podAge($pod) {
         chartCounts.data.datasets[2].data = history.map(function(h) { return h.nodes; });
         chartCounts.update('none');
       }
-      var hasMetrics = history.some(function(h) { return h.cpu != null || h.memory != null; });
-      if (hasMetrics && history[0].cpu != null) {
+      var hasMetrics = history.some(function(h) { return h.cpu != null || h.memory != null || h.max_pod_cpu != null || h.max_pod_memory != null; });
+      if (hasMetrics) {
         var wrap = document.getElementById('chart-metrics-wrap');
         if (wrap) wrap.style.display = '';
+        var ds = [
+          { label: 'Cluster CPU', data: history.map(function(h) { return h.cpu != null ? h.cpu : null; }), borderColor: '#e02f44', backgroundColor: 'rgba(224,47,68,0.1)', fill: true, tension: 0.3 },
+          { label: 'Cluster Memory (Mi)', data: history.map(function(h) { return h.memory != null ? h.memory : null; }), borderColor: '#5794f2', backgroundColor: 'rgba(87,148,242,0.1)', fill: true, tension: 0.3 },
+          { label: 'Max pod CPU', data: history.map(function(h) { return h.max_pod_cpu != null ? h.max_pod_cpu : null; }), borderColor: '#ff6b6b', backgroundColor: 'rgba(255,107,107,0.05)', fill: true, tension: 0.3, borderDash: [4,2] },
+          { label: 'Max pod Memory (Mi)', data: history.map(function(h) { return h.max_pod_memory != null ? h.max_pod_memory : null; }), borderColor: '#73bf69', backgroundColor: 'rgba(115,191,105,0.05)', fill: true, tension: 0.3, borderDash: [4,2] }
+        ];
         if (!chartMetrics) {
           chartMetrics = new Chart(document.getElementById('chart-metrics'), {
             type: 'line',
-            data: {
-              labels: labels,
-              datasets: [
-                { label: 'CPU (cores)', data: history.map(function(h) { return h.cpu != null ? h.cpu : null; }), borderColor: '#e02f44', backgroundColor: 'rgba(224,47,68,0.1)', fill: true, tension: 0.3 },
-                { label: 'Memory (Mi)', data: history.map(function(h) { return h.memory != null ? h.memory : null; }), borderColor: '#5794f2', backgroundColor: 'rgba(87,148,242,0.1)', fill: true, tension: 0.3 }
-              ]
-            },
+            data: { labels: labels, datasets: ds },
             options: opts
           });
         } else {
           chartMetrics.data.labels = labels;
           chartMetrics.data.datasets[0].data = history.map(function(h) { return h.cpu != null ? h.cpu : null; });
           chartMetrics.data.datasets[1].data = history.map(function(h) { return h.memory != null ? h.memory : null; });
+          chartMetrics.data.datasets[2].data = history.map(function(h) { return h.max_pod_cpu != null ? h.max_pod_cpu : null; });
+          chartMetrics.data.datasets[3].data = history.map(function(h) { return h.max_pod_memory != null ? h.max_pod_memory : null; });
           chartMetrics.update('none');
         }
       }
