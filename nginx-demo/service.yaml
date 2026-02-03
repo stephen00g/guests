@@ -3,10 +3,10 @@ kind: Service
 metadata:
   name: nginx-demo
 spec:
+  type: LoadBalancer  # Always use LoadBalancer for external access
   selector:
     app: nginx-demo
   ports:
     - port: 80
       targetPort: 80
-  type: LoadBalancer
 
