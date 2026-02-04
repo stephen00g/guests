@@ -17,12 +17,11 @@ $out = [
   'history' => []
 ];
 
-if (!file_exists($token_path) || !file_exists($ca_path)) {
+$token = (file_exists($token_path) && is_readable($token_path)) ? trim((string)@file_get_contents($token_path)) : '';
+if ($token === '' || !file_exists($ca_path)) {
   echo json_encode($out);
   exit;
 }
-
-$token = trim(file_get_contents($token_path));
 $ch = function($path) use ($api, $token, $ca_path) {
   $c = curl_init($api . $path);
   curl_setopt_array($c, [

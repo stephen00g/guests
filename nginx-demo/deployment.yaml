@@ -22,8 +22,24 @@ spec:
             - name: welcome-page
               mountPath: /var/www/html
               readOnly: true
+            - name: sa-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
       volumes:
         - name: welcome-page
           configMap:
             name: nginx-demo-welcome
+        # Explicit token mount (required on Kubernetes 1.24+ where legacy SA token is not auto-mounted)
+        - name: sa-token
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3607
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
 

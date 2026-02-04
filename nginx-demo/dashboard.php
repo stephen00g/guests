@@ -7,8 +7,8 @@ $nodes = [];
 $pods = [];
 $error = null;
 
-if (file_exists($token_path) && file_exists($ca_path)) {
-  $token = trim(file_get_contents($token_path));
+$token = (file_exists($token_path) && is_readable($token_path)) ? trim((string)@file_get_contents($token_path)) : '';
+if ($token !== '' && file_exists($ca_path)) {
   $ch = function($path) use ($api, $token, $ca_path) {
     $c = curl_init($api . $path);
     curl_setopt_array($c, [
@@ -63,6 +63,49 @@ function podAge($pod) {
   if ($sec < 86400) return floor($sec / 3600) . 'h';
   return floor($sec / 86400) . 'd';
 }
+
+function parseMemBytes($s) {
+  $s = trim((string)($s ?? ''));
+  if (preg_match('/^(\d+)Ki$/i', $s, $m)) return (int)$m[1] * 1024;
+  if (preg_match('/^(\d+)Mi$/i', $s, $m)) return (int)$m[1] * 1024 * 1024;
+  if (preg_match('/^(\d+)Gi$/i', $s, $m)) return (int)$m[1] * 1024 * 1024 * 1024;
+  if (preg_match('/^(\d+)$/', $s, $m)) return (int)$m[1];
+  return 0;
+}
+
+function clusterCapacity($nodes) {
+  $cpu = 0;
+  $memBytes = 0;
+  foreach ($nodes as $n) {
+    $c = $n['status']['capacity'] ?? [];
+    $cpu += (int)($c['cpu'] ?? 0);
+    $memBytes += parseMemBytes($c['memory'] ?? '');
+  }
+  return ['cpu' => $cpu, 'memory_gi' => round($memBytes / (1024**3), 1)];
+}
+
+function phaseCounts($pods) {
+  $out = ['Running' => 0, 'Pending' => 0, 'Succeeded' => 0, 'Failed' => 0, 'Unknown' => 0];
+  foreach ($pods as $p) {
+    $phase = $p['status']['phase'] ?? 'Unknown';
+    $out[$phase] = ($out[$phase] ?? 0) + 1;
+  }
+  return $out;
+}
+
+function namespacesFromPods($pods) {
+  $counts = [];
+  foreach ($pods as $p) {
+    $ns = $p['metadata']['namespace'] ?? '—';
+    $counts[$ns] = ($counts[$ns] ?? 0) + 1;
+  }
+  ksort($counts);
+  return $counts;
+}
+
+$clusterCap = !$error ? clusterCapacity($nodes) : ['cpu' => 0, 'memory_gi' => 0];
+$phaseCounts = !$error ? phaseCounts($pods) : [];
+$nsCounts = !$error ? namespacesFromPods($pods) : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -206,10 +249,63 @@ function podAge($pod) {
       padding: 0 0.4rem;
       font-variant-numeric: tabular-nums;
     }
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      padding: 0 1rem 0;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid #2d2d2d;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: #9d9d9d;
+      padding: 0.6rem 1rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      border-radius: 6px;
+      margin-bottom: -1px;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-btn:hover { color: #d8d9da; }
+    .tab-btn.active {
+      color: #5794f2;
+      border-bottom-color: #5794f2;
+      font-weight: 500;
+    }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .summary-card {
+      background: #181b1f;
+      border: 1px solid #2d2d2d;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    .summary-card h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #9d9d9d;
+      margin-bottom: 0.5rem;
+    }
+    .summary-card .row { display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 0.35rem; font-size: 0.9rem; }
+    .summary-card .row .v { color: #e0e0e0; font-variant-numeric: tabular-nums; }
+    .namespace-list { max-height: 200px; overflow-y: auto; }
+    .namespace-list .row { padding: 0.35rem 0; border-bottom: 1px solid #252526; }
+    .namespace-list .row:last-child { border-bottom: 0; }
     @media (max-width: 599px) {
       .panel-header { padding: 0.65rem 0.75rem; font-size: 0.85rem; }
       th, td { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
       .stat-card .value { font-size: 1.25rem; }
+      .tabs { padding: 0 0.75rem 0; }
+      .tab-btn { padding: 0.5rem 0.75rem; font-size: 0.8rem; }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -229,6 +325,15 @@ function podAge($pod) {
     <?php if ($error): ?>
       <div class="error-box"><?php echo htmlspecialchars($error); ?></div>
     <?php else: ?>
+      <nav class="tabs" role="tablist">
+        <button type="button" class="tab-btn active" data-tab="overview" role="tab">Overview</button>
+        <button type="button" class="tab-btn" data-tab="nodes" role="tab">Nodes</button>
+        <button type="button" class="tab-btn" data-tab="pods" role="tab">Pods</button>
+        <button type="button" class="tab-btn" data-tab="metrics" role="tab">Metrics</button>
+        <button type="button" class="tab-btn" data-tab="storage" role="tab">Storage</button>
+      </nav>
+
+      <div id="tab-overview" class="tab-pane active" role="tabpanel">
       <div class="stats-row" id="stats-row">
         <div class="stat-card">
           <span class="icon-wrap" style="color:#e0b000"><svg><use href="#icon-cpu"/></svg></span>
@@ -256,6 +361,30 @@ function podAge($pod) {
         </div>
       </div>
 
+      <div class="summary-grid">
+        <div class="summary-card">
+          <h3>Cluster capacity (all nodes)</h3>
+          <div class="row"><span>CPU</span><span class="v"><?php echo $clusterCap['cpu']; ?> cores</span></div>
+          <div class="row"><span>Memory</span><span class="v"><?php echo $clusterCap['memory_gi']; ?> Gi</span></div>
+        </div>
+        <div class="summary-card">
+          <h3>Pod status</h3>
+          <?php foreach ($phaseCounts as $phase => $cnt): if ($cnt > 0): ?>
+          <div class="row"><span class="<?php echo $phase === 'Running' ? 'status-ok' : ($phase === 'Pending' ? 'status-warn' : 'status-bad'); ?>"><?php echo htmlspecialchars($phase); ?></span><span class="v"><?php echo $cnt; ?></span></div>
+          <?php endif; endforeach; ?>
+        </div>
+        <div class="summary-card">
+          <h3>Namespaces (<?php echo count($nsCounts); ?>)</h3>
+          <div class="namespace-list">
+            <?php foreach ($nsCounts as $ns => $cnt): ?>
+            <div class="row"><span class="mono"><?php echo htmlspecialchars($ns); ?></span><span class="v"><?php echo $cnt; ?> pods</span></div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
+      </div><!-- /tab-overview -->
+
+      <div id="tab-metrics" class="tab-pane" role="tabpanel">
       <div class="panel" id="panel-live-metrics" style="display:none">
         <div class="panel-header">Live metrics (normalized 0–100% in time window)</div>
         <div class="panel-body" style="padding:1rem 1rem 1.25rem">
@@ -284,7 +413,9 @@ function podAge($pod) {
           </div>
         </div>
       </div>
+      </div><!-- /tab-metrics -->
 
+      <div id="tab-storage" class="tab-pane" role="tabpanel">
       <div class="panel">
         <div class="panel-header"><span class="icon-wrap" style="color:#9d9d9d"><svg><use href="#icon-drive"/></svg></span> Storage</div>
         <div class="panel-body" style="padding:1rem">
@@ -294,7 +425,9 @@ function podAge($pod) {
           </div>
         </div>
       </div>
+      </div><!-- /tab-storage -->
 
+      <div id="tab-nodes" class="tab-pane" role="tabpanel">
       <div class="panel">
         <div class="panel-header">Nodes</div>
         <div class="panel-body">
@@ -330,7 +463,9 @@ function podAge($pod) {
           </table></div>
         </div>
       </div>
+      </div><!-- /tab-nodes -->
 
+      <div id="tab-pods" class="tab-pane" role="tabpanel">
       <div class="panel">
         <div class="panel-header">Pods</div>
         <div class="panel-body">
@@ -368,6 +503,7 @@ function podAge($pod) {
           </table></div>
         </div>
       </div>
+      </div><!-- /tab-pods -->
     <?php endif; ?>
   </div>
   <?php if (!$error): ?>
@@ -375,6 +511,27 @@ function podAge($pod) {
   (function() {
     var chartMetrics = null;
     var pollInterval = 2000;
+
+    function initTabs() {
+      var storageKey = 'cluster-dashboard-tab';
+      var btns = document.querySelectorAll('.tab-btn');
+      var panes = document.querySelectorAll('.tab-pane');
+      var saved = sessionStorage.getItem(storageKey) || 'overview';
+      function show(tabId) {
+        btns.forEach(function(b) {
+          b.classList.toggle('active', b.getAttribute('data-tab') === tabId);
+        });
+        panes.forEach(function(p) {
+          p.classList.toggle('active', p.id === 'tab-' + tabId);
+        });
+        sessionStorage.setItem(storageKey, tabId);
+      }
+      btns.forEach(function(b) {
+        b.addEventListener('click', function() { show(b.getAttribute('data-tab')); });
+      });
+      show(saved);
+    }
+    initTabs();
 
     function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function updateStats(data) {
