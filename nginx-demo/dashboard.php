@@ -300,6 +300,17 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
     .namespace-list { max-height: 200px; overflow-y: auto; }
     .namespace-list .row { padding: 0.35rem 0; border-bottom: 1px solid #252526; }
     .namespace-list .row:last-child { border-bottom: 0; }
+    .metrics-message {
+      background: rgba(224, 176, 0, 0.1);
+      border: 1px solid rgba(224, 176, 0, 0.4);
+      color: #e0c060;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+    .metrics-message a { color: #90c0ff; }
     @media (max-width: 599px) {
       .panel-header { padding: 0.65rem 0.75rem; font-size: 0.85rem; }
       th, td { padding: 0.5rem 0.75rem; font-size: 0.875rem; }
@@ -361,6 +372,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         </div>
       </div>
 
+      <div id="metrics-message" class="metrics-message" style="display:none" role="status"></div>
       <div class="summary-grid">
         <div class="summary-card">
           <h3>Cluster capacity (all nodes)</h3>
@@ -535,6 +547,15 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
 
     function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function updateStats(data) {
+      var msgEl = document.getElementById('metrics-message');
+      if (msgEl) {
+        if (data.metrics_message) {
+          msgEl.style.display = '';
+          msgEl.textContent = data.metrics_message;
+        } else {
+          msgEl.style.display = 'none';
+        }
+      }
       ['nodes','pods','running'].forEach(function(k) {
         var el = document.querySelector('[data-live="' + k + '"]');
         if (el && data[k] !== undefined) el.textContent = data[k];

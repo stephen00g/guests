@@ -14,7 +14,9 @@ $out = [
   'top_cpu_pods' => [], 'top_memory_pods' => [],
   'max_pod_cpu' => null, 'max_pod_memory' => null,
   'storage_mi' => null, 'top_storage_pods' => [],
-  'history' => []
+  'history' => [],
+  'metrics_available' => null,
+  'metrics_message' => null,
 ];
 
 $token = (file_exists($token_path) && is_readable($token_path)) ? trim((string)@file_get_contents($token_path)) : '';
@@ -34,6 +36,21 @@ $ch = function($path) use ($api, $token, $ca_path) {
   $code = curl_getinfo($c, CURLINFO_HTTP_CODE);
   curl_close($c);
   return $code === 200 ? json_decode($body, true) : null;
+};
+
+/** Call API and return [http_code, decoded_body]. Used to detect metrics-server availability. */
+$chWithCode = function($path) use ($api, $token, $ca_path) {
+  $c = curl_init($api . $path);
+  curl_setopt_array($c, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token],
+    CURLOPT_CAINFO => $ca_path,
+    CURLOPT_TIMEOUT => 4,
+  ]);
+  $body = curl_exec($c);
+  $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+  curl_close($c);
+  return [$code, $code === 200 ? json_decode($body, true) : null];
 };
 
 function parseQuantity($s) {
@@ -61,8 +78,16 @@ $running = count(array_filter($pods, fn($p) => ($p['status']['phase'] ?? '') ===
 
 $cpu = null;
 $memory = null;
-$nodeMetrics = $ch('/apis/metrics.k8s.io/v1beta1/nodes');
+list($metricsCode, $nodeMetrics) = $chWithCode('/apis/metrics.k8s.io/v1beta1/nodes');
+if ($metricsCode === 404 || $metricsCode === 503 || $metricsCode === 501 || $metricsCode === 403) {
+  $out['metrics_available'] = false;
+  $out['metrics_message'] = $metricsCode === 403
+    ? 'No permission to read metrics (check RBAC for metrics.k8s.io).'
+    : 'Metrics-server is not installed. CPU/memory and top consumers need it. Single-node and minimal clusters often omit it. Install with: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml (then wait 1–2 min for metrics to appear).';
+}
 if ($nodeMetrics !== null && !empty($nodeMetrics['items'])) {
+  $out['metrics_available'] = true;
+  $out['metrics_message'] = null;
   $cpu = 0;
   $memory = 0;
   foreach ($nodeMetrics['items'] as $m) {
@@ -70,6 +95,9 @@ if ($nodeMetrics !== null && !empty($nodeMetrics['items'])) {
     $memory += parseQuantity($m['usage']['memory'] ?? '0');
   }
   $memory = round($memory / (1024 * 1024), 1);
+} elseif ($out['metrics_available'] === null && $metricsCode === 200) {
+  $out['metrics_available'] = true;
+  $out['metrics_message'] = 'Metrics API responded but returned no node data yet (metrics-server may still be warming up).';
 }
 
 $podMetrics = $ch('/apis/metrics.k8s.io/v1beta1/pods?limit=500');
