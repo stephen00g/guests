@@ -13,7 +13,7 @@ $out = [
   'cpu' => null, 'memory' => null,
   'top_cpu_pods' => [], 'top_memory_pods' => [],
   'max_pod_cpu' => null, 'max_pod_memory' => null,
-  'storage_mi' => null, 'top_storage_pods' => [],
+  'storage_mb' => null, 'top_storage_pods' => [],
   'history' => [],
   'metrics_available' => null,
   'metrics_message' => null,
@@ -94,7 +94,7 @@ if ($nodeMetrics !== null && !empty($nodeMetrics['items'])) {
     $cpu += parseQuantity($m['usage']['cpu'] ?? '0');
     $memory += parseQuantity($m['usage']['memory'] ?? '0');
   }
-  $memory = round($memory / (1024 * 1024), 1);
+  $memory = round($memory / 1e6, 1);
 } elseif ($out['metrics_available'] === null && $metricsCode === 200) {
   $out['metrics_available'] = true;
   $out['metrics_message'] = 'Metrics API responded but returned no node data yet (metrics-server may still be warming up).';
@@ -125,21 +125,21 @@ if ($podMetrics !== null && !empty($podMetrics['items'])) {
         $podStorage += parseQuantity($u['ephemeral-storage']);
       }
     }
-    $podMemMi = round($podMem / (1024 * 1024), 2);
-    $podStorageMi = round($podStorage / (1024 * 1024), 1);
-    $podUsageList[] = ['namespace' => $ns, 'name' => $name, 'cpu' => round($podCpu, 3), 'memory_mi' => $podMemMi, 'storage_mi' => $podStorageMi];
+    $podMemMb = round($podMem / 1e6, 2);
+    $podStorageMb = round($podStorage / 1e6, 1);
+    $podUsageList[] = ['namespace' => $ns, 'name' => $name, 'cpu' => round($podCpu, 3), 'memory_mb' => $podMemMb, 'storage_mb' => $podStorageMb];
     if ($podCpu > 0 && ($maxPodCpu === null || $podCpu > $maxPodCpu)) $maxPodCpu = $podCpu;
-    if ($podMemMi > 0 && ($maxPodMem === null || $podMemMi > $maxPodMem)) $maxPodMem = $podMemMi;
-    if ($podStorageMi > 0) {
-      $storageTotal += $podStorageMi;
-      $storageList[] = ['namespace' => $ns, 'name' => $name, 'storage_mi' => $podStorageMi];
+    if ($podMemMb > 0 && ($maxPodMem === null || $podMemMb > $maxPodMem)) $maxPodMem = $podMemMb;
+    if ($podStorageMb > 0) {
+      $storageTotal += $podStorageMb;
+      $storageList[] = ['namespace' => $ns, 'name' => $name, 'storage_mb' => $podStorageMb];
     }
   }
   usort($podUsageList, fn($a, $b) => $b['cpu'] <=> $a['cpu']);
   $topCpuPods = array_slice($podUsageList, 0, 10);
-  usort($podUsageList, fn($a, $b) => $b['memory_mi'] <=> $a['memory_mi']);
+  usort($podUsageList, fn($a, $b) => $b['memory_mb'] <=> $a['memory_mb']);
   $topMemoryPods = array_slice($podUsageList, 0, 10);
-  usort($storageList, fn($a, $b) => $b['storage_mi'] <=> $a['storage_mi']);
+  usort($storageList, fn($a, $b) => $b['storage_mb'] <=> $a['storage_mb']);
   $topStoragePods = array_slice($storageList, 0, 10);
 }
 
@@ -152,7 +152,7 @@ $out['top_cpu_pods'] = $topCpuPods;
 $out['top_memory_pods'] = $topMemoryPods;
 $out['max_pod_cpu'] = $maxPodCpu;
 $out['max_pod_memory'] = $maxPodMem;
-$out['storage_mi'] = $storageTotal > 0 ? round($storageTotal, 1) : null;
+$out['storage_mb'] = $storageTotal > 0 ? round($storageTotal, 1) : null;
 $out['top_storage_pods'] = $topStoragePods;
 $out['t'] = time();
 

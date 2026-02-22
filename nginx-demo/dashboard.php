@@ -364,11 +364,11 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         </div>
         <div class="stat-card" id="stat-memory" style="display:none">
           <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span>
-          <div><div class="value" data-live="memory">—</div><div class="label">Memory (Mi)</div></div>
+          <div><div class="value" data-live="memory">—</div><div class="label">Memory (MB)</div></div>
         </div>
         <div class="stat-card" id="stat-storage" style="display:none">
           <span class="icon-wrap" style="color:#9d9d9d"><svg><use href="#icon-drive"/></svg></span>
-          <div><div class="value" data-live="storage">—</div><div class="label">Storage (Mi)</div></div>
+          <div><div class="value" data-live="storage">—</div><div class="label">Storage (MB)</div></div>
         </div>
       </div>
 
@@ -420,7 +420,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
               <div class="panel-header" style="border-bottom:0;padding:0 0 0.5rem 0">
                 <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span> Top Memory (pods)
               </div>
-              <div class="table-wrap"><table><thead><tr><th>Pod</th><th>Namespace</th><th>Mi</th></tr></thead><tbody id="top-memory-tbody"></tbody></table></div>
+              <div class="table-wrap"><table><thead><tr><th>Pod</th><th>Namespace</th><th>MB</th></tr></thead><tbody id="top-memory-tbody"></tbody></table></div>
             </div>
           </div>
         </div>
@@ -433,7 +433,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         <div class="panel-body" style="padding:1rem">
           <div id="storage-content">
             <p class="storage-note">Ephemeral storage usage (when reported by metrics-server). Disk read/write speed requires Prometheus and node_exporter.</p>
-            <div class="table-wrap"><table id="storage-table" style="display:none"><thead><tr><th>Pod</th><th>Namespace</th><th>Mi</th></tr></thead><tbody id="top-storage-tbody"></tbody></table></div>
+            <div class="table-wrap"><table id="storage-table" style="display:none"><thead><tr><th>Pod</th><th>Namespace</th><th>MB</th></tr></thead><tbody id="top-storage-tbody"></tbody></table></div>
           </div>
         </div>
       </div>
@@ -570,10 +570,10 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         var memCard = document.getElementById('stat-memory');
         if (memEl && memCard) { memEl.textContent = data.memory; memCard.style.display = ''; }
       }
-      if (data.storage_mi != null) {
+      if (data.storage_mb != null) {
         var stEl = document.querySelector('[data-live="storage"]');
         var stCard = document.getElementById('stat-storage');
-        if (stEl && stCard) { stEl.textContent = data.storage_mi; stCard.style.display = ''; }
+        if (stEl && stCard) { stEl.textContent = data.storage_mb; stCard.style.display = ''; }
       }
       var topCpu = data.top_cpu_pods || [];
       var topMem = data.top_memory_pods || [];
@@ -591,7 +591,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
           return 'rgb(' + Math.round(224) + ',' + Math.round(176 + (47 - 176) * t) + ',' + Math.round(0 + (68 - 0) * t) + ')';
         }
         var maxCpu = topCpu.length ? Math.max.apply(null, topCpu.map(function(p) { return p.cpu; })) : 1;
-        var maxMem = topMem.length ? Math.max.apply(null, topMem.map(function(p) { return p.memory_mi; })) : 1;
+        var maxMem = topMem.length ? Math.max.apply(null, topMem.map(function(p) { return p.memory_mb; })) : 1;
         if (maxCpu <= 0) maxCpu = 1;
         if (maxMem <= 0) maxMem = 1;
         var cpuTbody = document.getElementById('top-cpu-tbody');
@@ -602,9 +602,9 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         }).join('');
         var memTbody = document.getElementById('top-memory-tbody');
         if (memTbody) memTbody.innerHTML = topMem.slice(0, 10).map(function(p) {
-          var pct = maxMem > 0 ? Math.min(1, p.memory_mi / maxMem) : 0;
+          var pct = maxMem > 0 ? Math.min(1, p.memory_mb / maxMem) : 0;
           var color = heatColor(pct);
-          return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + p.memory_mi + '</span></span></td></tr>';
+          return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + p.memory_mb + '</span></span></td></tr>';
         }).join('');
       }
       var topStorage = data.top_storage_pods || [];
@@ -612,7 +612,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
       var storageTbody = document.getElementById('top-storage-tbody');
       if (topStorage.length && storageTable && storageTbody) {
         storageTable.style.display = '';
-        storageTbody.innerHTML = topStorage.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.storage_mi + '</td></tr>'; }).join('');
+        storageTbody.innerHTML = topStorage.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.storage_mb + '</td></tr>'; }).join('');
       }
     }
 

@@ -69,6 +69,7 @@ data:
       if ($sec < 86400) return floor($sec / 3600) . 'h';
       return floor($sec / 86400) . 'd';
     }
+    
     function parseMemBytes($s) {
       $s = trim((string)($s ?? ''));
       if (preg_match('/^(\d+)Ki$/i', $s, $m)) return (int)$m[1] * 1024;
@@ -77,6 +78,7 @@ data:
       if (preg_match('/^(\d+)$/', $s, $m)) return (int)$m[1];
       return 0;
     }
+    
     function clusterCapacity($nodes) {
       $cpu = 0;
       $memBytes = 0;
@@ -87,6 +89,7 @@ data:
       }
       return ['cpu' => $cpu, 'memory_gi' => round($memBytes / (1024**3), 1)];
     }
+    
     function phaseCounts($pods) {
       $out = ['Running' => 0, 'Pending' => 0, 'Succeeded' => 0, 'Failed' => 0, 'Unknown' => 0];
       foreach ($pods as $p) {
@@ -95,6 +98,7 @@ data:
       }
       return $out;
     }
+    
     function namespacesFromPods($pods) {
       $counts = [];
       foreach ($pods as $p) {
@@ -104,6 +108,7 @@ data:
       ksort($counts);
       return $counts;
     }
+    
     $clusterCap = !$error ? clusterCapacity($nodes) : ['cpu' => 0, 'memory_gi' => 0];
     $phaseCounts = !$error ? phaseCounts($pods) : [];
     $nsCounts = !$error ? namespacesFromPods($pods) : [];
@@ -344,6 +349,7 @@ data:
             <button type="button" class="tab-btn" data-tab="metrics" role="tab">Metrics</button>
             <button type="button" class="tab-btn" data-tab="storage" role="tab">Storage</button>
           </nav>
+    
           <div id="tab-overview" class="tab-pane active" role="tabpanel">
           <div class="stats-row" id="stats-row">
             <div class="stat-card">
@@ -364,13 +370,14 @@ data:
             </div>
             <div class="stat-card" id="stat-memory" style="display:none">
               <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span>
-              <div><div class="value" data-live="memory">—</div><div class="label">Memory (Mi)</div></div>
+              <div><div class="value" data-live="memory">—</div><div class="label">Memory (MB)</div></div>
             </div>
             <div class="stat-card" id="stat-storage" style="display:none">
               <span class="icon-wrap" style="color:#9d9d9d"><svg><use href="#icon-drive"/></svg></span>
-              <div><div class="value" data-live="storage">—</div><div class="label">Storage (Mi)</div></div>
+              <div><div class="value" data-live="storage">—</div><div class="label">Storage (MB)</div></div>
             </div>
           </div>
+    
           <div id="metrics-message" class="metrics-message" style="display:none" role="status"></div>
           <div class="summary-grid">
             <div class="summary-card">
@@ -394,6 +401,7 @@ data:
             </div>
           </div>
           </div><!-- /tab-overview -->
+    
           <div id="tab-metrics" class="tab-pane" role="tabpanel">
           <div class="panel" id="panel-live-metrics" style="display:none">
             <div class="panel-header">Live metrics (normalized 0–100% in time window)</div>
@@ -418,23 +426,25 @@ data:
                   <div class="panel-header" style="border-bottom:0;padding:0 0 0.5rem 0">
                     <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span> Top Memory (pods)
                   </div>
-                  <div class="table-wrap"><table><thead><tr><th>Pod</th><th>Namespace</th><th>Mi</th></tr></thead><tbody id="top-memory-tbody"></tbody></table></div>
+                  <div class="table-wrap"><table><thead><tr><th>Pod</th><th>Namespace</th><th>MB</th></tr></thead><tbody id="top-memory-tbody"></tbody></table></div>
                 </div>
               </div>
             </div>
           </div>
           </div><!-- /tab-metrics -->
+    
           <div id="tab-storage" class="tab-pane" role="tabpanel">
           <div class="panel">
             <div class="panel-header"><span class="icon-wrap" style="color:#9d9d9d"><svg><use href="#icon-drive"/></svg></span> Storage</div>
             <div class="panel-body" style="padding:1rem">
               <div id="storage-content">
                 <p class="storage-note">Ephemeral storage usage (when reported by metrics-server). Disk read/write speed requires Prometheus and node_exporter.</p>
-                <div class="table-wrap"><table id="storage-table" style="display:none"><thead><tr><th>Pod</th><th>Namespace</th><th>Mi</th></tr></thead><tbody id="top-storage-tbody"></tbody></table></div>
+                <div class="table-wrap"><table id="storage-table" style="display:none"><thead><tr><th>Pod</th><th>Namespace</th><th>MB</th></tr></thead><tbody id="top-storage-tbody"></tbody></table></div>
               </div>
             </div>
           </div>
           </div><!-- /tab-storage -->
+    
           <div id="tab-nodes" class="tab-pane" role="tabpanel">
           <div class="panel">
             <div class="panel-header">Nodes</div>
@@ -472,6 +482,7 @@ data:
             </div>
           </div>
           </div><!-- /tab-nodes -->
+    
           <div id="tab-pods" class="tab-pane" role="tabpanel">
           <div class="panel">
             <div class="panel-header">Pods</div>
@@ -518,6 +529,7 @@ data:
       (function() {
         var chartMetrics = null;
         var pollInterval = 2000;
+    
         function initTabs() {
           var storageKey = 'cluster-dashboard-tab';
           var btns = document.querySelectorAll('.tab-btn');
@@ -538,6 +550,7 @@ data:
           show(saved);
         }
         initTabs();
+    
         function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
         function updateStats(data) {
           var msgEl = document.getElementById('metrics-message');
@@ -563,10 +576,10 @@ data:
             var memCard = document.getElementById('stat-memory');
             if (memEl && memCard) { memEl.textContent = data.memory; memCard.style.display = ''; }
           }
-          if (data.storage_mi != null) {
+          if (data.storage_mb != null) {
             var stEl = document.querySelector('[data-live="storage"]');
             var stCard = document.getElementById('stat-storage');
-            if (stEl && stCard) { stEl.textContent = data.storage_mi; stCard.style.display = ''; }
+            if (stEl && stCard) { stEl.textContent = data.storage_mb; stCard.style.display = ''; }
           }
           var topCpu = data.top_cpu_pods || [];
           var topMem = data.top_memory_pods || [];
@@ -584,7 +597,7 @@ data:
               return 'rgb(' + Math.round(224) + ',' + Math.round(176 + (47 - 176) * t) + ',' + Math.round(0 + (68 - 0) * t) + ')';
             }
             var maxCpu = topCpu.length ? Math.max.apply(null, topCpu.map(function(p) { return p.cpu; })) : 1;
-            var maxMem = topMem.length ? Math.max.apply(null, topMem.map(function(p) { return p.memory_mi; })) : 1;
+            var maxMem = topMem.length ? Math.max.apply(null, topMem.map(function(p) { return p.memory_mb; })) : 1;
             if (maxCpu <= 0) maxCpu = 1;
             if (maxMem <= 0) maxMem = 1;
             var cpuTbody = document.getElementById('top-cpu-tbody');
@@ -595,9 +608,9 @@ data:
             }).join('');
             var memTbody = document.getElementById('top-memory-tbody');
             if (memTbody) memTbody.innerHTML = topMem.slice(0, 10).map(function(p) {
-              var pct = maxMem > 0 ? Math.min(1, p.memory_mi / maxMem) : 0;
+              var pct = maxMem > 0 ? Math.min(1, p.memory_mb / maxMem) : 0;
               var color = heatColor(pct);
-              return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + p.memory_mi + '</span></span></td></tr>';
+              return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + p.memory_mb + '</span></span></td></tr>';
             }).join('');
           }
           var topStorage = data.top_storage_pods || [];
@@ -605,7 +618,7 @@ data:
           var storageTbody = document.getElementById('top-storage-tbody');
           if (topStorage.length && storageTable && storageTbody) {
             storageTable.style.display = '';
-            storageTbody.innerHTML = topStorage.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.storage_mi + '</td></tr>'; }).join('');
+            storageTbody.innerHTML = topStorage.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.storage_mb + '</td></tr>'; }).join('');
           }
         }
     
@@ -712,16 +725,17 @@ data:
       'cpu' => null, 'memory' => null,
       'top_cpu_pods' => [], 'top_memory_pods' => [],
       'max_pod_cpu' => null, 'max_pod_memory' => null,
-      'storage_mi' => null, 'top_storage_pods' => [],
-      'history' => []
+      'storage_mb' => null, 'top_storage_pods' => [],
+      'history' => [],
+      'metrics_available' => null,
+      'metrics_message' => null,
     ];
     
-    if (!file_exists($token_path) || !file_exists($ca_path)) {
+    $token = (file_exists($token_path) && is_readable($token_path)) ? trim((string)@file_get_contents($token_path)) : '';
+    if ($token === '' || !file_exists($ca_path)) {
       echo json_encode($out);
       exit;
     }
-    
-    $token = trim(file_get_contents($token_path));
     $ch = function($path) use ($api, $token, $ca_path) {
       $c = curl_init($api . $path);
       curl_setopt_array($c, [
@@ -734,6 +748,21 @@ data:
       $code = curl_getinfo($c, CURLINFO_HTTP_CODE);
       curl_close($c);
       return $code === 200 ? json_decode($body, true) : null;
+    };
+    
+    /** Call API and return [http_code, decoded_body]. Used to detect metrics-server availability. */
+    $chWithCode = function($path) use ($api, $token, $ca_path) {
+      $c = curl_init($api . $path);
+      curl_setopt_array($c, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token],
+        CURLOPT_CAINFO => $ca_path,
+        CURLOPT_TIMEOUT => 4,
+      ]);
+      $body = curl_exec($c);
+      $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+      curl_close($c);
+      return [$code, $code === 200 ? json_decode($body, true) : null];
     };
     
     function parseQuantity($s) {
@@ -761,15 +790,26 @@ data:
     
     $cpu = null;
     $memory = null;
-    $nodeMetrics = $ch('/apis/metrics.k8s.io/v1beta1/nodes');
+    list($metricsCode, $nodeMetrics) = $chWithCode('/apis/metrics.k8s.io/v1beta1/nodes');
+    if ($metricsCode === 404 || $metricsCode === 503 || $metricsCode === 501 || $metricsCode === 403) {
+      $out['metrics_available'] = false;
+      $out['metrics_message'] = $metricsCode === 403
+        ? 'No permission to read metrics (check RBAC for metrics.k8s.io).'
+        : 'Metrics-server is not installed. CPU/memory and top consumers need it. Single-node and minimal clusters often omit it. Install with: kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml (then wait 1–2 min for metrics to appear).';
+    }
     if ($nodeMetrics !== null && !empty($nodeMetrics['items'])) {
+      $out['metrics_available'] = true;
+      $out['metrics_message'] = null;
       $cpu = 0;
       $memory = 0;
       foreach ($nodeMetrics['items'] as $m) {
         $cpu += parseQuantity($m['usage']['cpu'] ?? '0');
         $memory += parseQuantity($m['usage']['memory'] ?? '0');
       }
-      $memory = round($memory / (1024 * 1024), 1);
+      $memory = round($memory / 1e6, 1);
+    } elseif ($out['metrics_available'] === null && $metricsCode === 200) {
+      $out['metrics_available'] = true;
+      $out['metrics_message'] = 'Metrics API responded but returned no node data yet (metrics-server may still be warming up).';
     }
     
     $podMetrics = $ch('/apis/metrics.k8s.io/v1beta1/pods?limit=500');
@@ -797,21 +837,21 @@ data:
             $podStorage += parseQuantity($u['ephemeral-storage']);
           }
         }
-        $podMemMi = round($podMem / (1024 * 1024), 2);
-        $podStorageMi = round($podStorage / (1024 * 1024), 1);
-        $podUsageList[] = ['namespace' => $ns, 'name' => $name, 'cpu' => round($podCpu, 3), 'memory_mi' => $podMemMi, 'storage_mi' => $podStorageMi];
+        $podMemMb = round($podMem / 1e6, 2);
+        $podStorageMb = round($podStorage / 1e6, 1);
+        $podUsageList[] = ['namespace' => $ns, 'name' => $name, 'cpu' => round($podCpu, 3), 'memory_mb' => $podMemMb, 'storage_mb' => $podStorageMb];
         if ($podCpu > 0 && ($maxPodCpu === null || $podCpu > $maxPodCpu)) $maxPodCpu = $podCpu;
-        if ($podMemMi > 0 && ($maxPodMem === null || $podMemMi > $maxPodMem)) $maxPodMem = $podMemMi;
-        if ($podStorageMi > 0) {
-          $storageTotal += $podStorageMi;
-          $storageList[] = ['namespace' => $ns, 'name' => $name, 'storage_mi' => $podStorageMi];
+        if ($podMemMb > 0 && ($maxPodMem === null || $podMemMb > $maxPodMem)) $maxPodMem = $podMemMb;
+        if ($podStorageMb > 0) {
+          $storageTotal += $podStorageMb;
+          $storageList[] = ['namespace' => $ns, 'name' => $name, 'storage_mb' => $podStorageMb];
         }
       }
       usort($podUsageList, fn($a, $b) => $b['cpu'] <=> $a['cpu']);
       $topCpuPods = array_slice($podUsageList, 0, 10);
-      usort($podUsageList, fn($a, $b) => $b['memory_mi'] <=> $a['memory_mi']);
+      usort($podUsageList, fn($a, $b) => $b['memory_mb'] <=> $a['memory_mb']);
       $topMemoryPods = array_slice($podUsageList, 0, 10);
-      usort($storageList, fn($a, $b) => $b['storage_mi'] <=> $a['storage_mi']);
+      usort($storageList, fn($a, $b) => $b['storage_mb'] <=> $a['storage_mb']);
       $topStoragePods = array_slice($storageList, 0, 10);
     }
     
@@ -824,7 +864,7 @@ data:
     $out['top_memory_pods'] = $topMemoryPods;
     $out['max_pod_cpu'] = $maxPodCpu;
     $out['max_pod_memory'] = $maxPodMem;
-    $out['storage_mi'] = $storageTotal > 0 ? round($storageTotal, 1) : null;
+    $out['storage_mb'] = $storageTotal > 0 ? round($storageTotal, 1) : null;
     $out['top_storage_pods'] = $topStoragePods;
     $out['t'] = time();
     
