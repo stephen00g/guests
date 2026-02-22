@@ -70,11 +70,15 @@ function nodeCpuType($node) {
   $vendor = $labels['feature.node.kubernetes.io/cpu-model.vendor_id'] ?? '';
   $family = $labels['feature.node.kubernetes.io/cpu-model.family'] ?? '';
   $modelId = $labels['feature.node.kubernetes.io/cpu-model.id'] ?? '';
-  $parts = [];
-  if ($vendor !== '') $parts[] = $vendor;
-  if ($family !== '') $parts[] = 'family ' . $family;
-  if ($modelId !== '') $parts[] = 'model ' . $modelId;
-  if (!empty($parts)) return implode(' · ', $parts);
+  if ($vendor !== '' || $family !== '' || $modelId !== '') {
+    $vendorMap = ['GenuineIntel' => 'Intel', 'AuthenticAMD' => 'AMD', 'HygonGenuine' => 'Hygon'];
+    $vendorReadable = $vendorMap[$vendor] ?? $vendor;
+    $parts = [];
+    if ($vendorReadable !== '') $parts[] = $vendorReadable;
+    if ($family !== '') $parts[] = 'Family ' . $family;
+    if ($modelId !== '') $parts[] = 'Model ' . $modelId;
+    return implode(', ', $parts);
+  }
   foreach ($labels as $key => $val) {
     if (strpos($key, 'feature.node.kubernetes.io/cpu-model') === 0 && $val !== '') return $val;
   }
@@ -169,11 +173,16 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
       gap: 0.75rem;
       flex-wrap: wrap;
     }
+    .navbar-brand { display: flex; flex-direction: column; gap: 0.1rem; }
     .navbar h1 {
       font-size: clamp(1rem, 4vw, 1.1rem);
       font-weight: 600;
       color: #e0e0e0;
     }
+    .navbar .version-line { font-size: 0.7rem; color: #6d6d6d; font-weight: normal; }
+    .nfd-note { margin: 0; padding: 0.5rem 1rem; font-size: 0.8rem; color: #9d9d9d; border-bottom: 1px solid #252526; }
+    .nfd-note a { color: #5794f2; text-decoration: none; }
+    .nfd-note a:hover { text-decoration: underline; }
     .navbar .badge {
       background: #252526;
       color: #9d9d9d;
@@ -249,7 +258,6 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
     .stat-card .value { font-size: 1.5rem; font-weight: 600; color: #5794f2; }
     .stat-card .label { color: #9d9d9d; font-size: 0.75rem; margin-top: 0.25rem; }
     .live-indicator { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: #73bf69; margin-left: auto; }
-    .version-badge { font-size: 0.7rem; color: #6d6d6d; }
     .update-banner {
       position: fixed;
       bottom: 1rem;
@@ -393,10 +401,12 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
 </head>
 <body>
   <div class="navbar">
-    <h1>Cluster Dashboard</h1>
+    <div class="navbar-brand">
+      <h1>Cluster Dashboard</h1>
+      <span class="version-line" id="version-line" title="Dashboard version">—</span>
+    </div>
     <span class="badge">Kubernetes</span>
     <span class="live-indicator" id="live-indicator"><span class="live-dot"></span> Live</span>
-    <span class="version-badge" id="version-badge" title="Dashboard version">—</span>
   </div>
   <div class="update-banner" id="update-banner" style="display:none" role="alert">
     <span>New version available.</span>
@@ -512,6 +522,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
       <div id="tab-nodes" class="tab-pane" role="tabpanel">
       <div class="panel">
         <div class="panel-header">Nodes</div>
+        <p class="nfd-note">CPU type shows vendor, family and model when <a href="https://github.com/kubernetes-sigs/node-feature-discovery#readme" target="_blank" rel="noopener">Node Feature Discovery (NFD)</a> is installed; otherwise architecture or cloud instance type.</p>
         <div class="panel-body">
           <div class="table-wrap"><table>
             <thead>
@@ -784,8 +795,8 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
     var versionCheckInterval = 45000;
     function setVersion(v) {
       currentVersion = v;
-      var el = document.getElementById('version-badge');
-      if (el) el.textContent = v !== '—' ? 'v ' + v : '';
+      var el = document.getElementById('version-line');
+      if (el) el.textContent = v ? 'v ' + v : '';
     }
     function checkVersion() {
       fetch('version.php').then(function(r) { return r.json(); }).then(function(d) {
