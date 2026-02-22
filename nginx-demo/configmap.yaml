@@ -70,6 +70,12 @@ data:
     }
     
     function nodeCpuType($node) {
+      static $intelFamily6Model = [
+        26 => 'Nehalem', 30 => 'Nehalem', 37 => 'Westmere', 42 => 'Sandy Bridge', 45 => 'Sandy Bridge',
+        58 => 'Ivy Bridge', 60 => 'Ivy Bridge', 63 => 'Haswell', 69 => 'Haswell', 79 => 'Broadwell',
+        85 => 'Skylake', 94 => 'Skylake', 142 => 'Kaby Lake', 158 => 'Coffee Lake', 165 => 'Comet Lake',
+        166 => 'Ice Lake', 167 => 'Rocket Lake', 183 => 'Alder Lake', 190 => 'Raptor Lake',
+      ];
       $labels = $node['metadata']['labels'] ?? [];
       if (!empty($labels['node.kubernetes.io/instance-type'])) return $labels['node.kubernetes.io/instance-type'];
       if (!empty($labels['beta.kubernetes.io/instance-type'])) return $labels['beta.kubernetes.io/instance-type'];
@@ -81,8 +87,14 @@ data:
         $vendorReadable = $vendorMap[$vendor] ?? $vendor;
         $parts = [];
         if ($vendorReadable !== '') $parts[] = $vendorReadable;
-        if ($family !== '') $parts[] = 'Family ' . $family;
-        if ($modelId !== '') $parts[] = 'Model ' . $modelId;
+        if ($family !== '' && $family !== '6') $parts[] = 'Family ' . $family;
+        if ($modelId !== '') {
+          $codename = ($vendor === 'GenuineIntel' && $family === '6' && isset($intelFamily6Model[(int)$modelId]))
+            ? $intelFamily6Model[(int)$modelId] : null;
+          $parts[] = 'Model ' . $modelId . ($codename !== null ? ' (' . $codename . ')' : '');
+        } elseif ($family !== '') {
+          $parts[] = 'Family ' . $family;
+        }
         return implode(', ', $parts);
       }
       foreach ($labels as $key => $val) {
@@ -186,9 +198,16 @@ data:
           color: #e0e0e0;
         }
         .navbar .version-line { font-size: 0.7rem; color: #6d6d6d; font-weight: normal; }
-        .nfd-note { margin: 0; padding: 0.5rem 1rem; font-size: 0.8rem; color: #9d9d9d; border-bottom: 1px solid #252526; }
-        .nfd-note a { color: #5794f2; text-decoration: none; }
-        .nfd-note a:hover { text-decoration: underline; }
+        .header-tip {
+          display: inline-flex;
+          align-items: center;
+          margin-left: 0.35rem;
+          color: #6d6d6d;
+          cursor: help;
+          font-size: 0.85em;
+          font-weight: normal;
+        }
+        .header-tip:hover { color: #9d9d9d; }
         .navbar .badge {
           background: #252526;
           color: #9d9d9d;
@@ -527,8 +546,7 @@ data:
     
           <div id="tab-nodes" class="tab-pane" role="tabpanel">
           <div class="panel">
-            <div class="panel-header">Nodes</div>
-            <p class="nfd-note">CPU type shows vendor, family and model when <a href="https://github.com/kubernetes-sigs/node-feature-discovery#readme" target="_blank" rel="noopener">Node Feature Discovery (NFD)</a> is installed; otherwise architecture or cloud instance type.</p>
+            <div class="panel-header">Nodes <span class="header-tip" title="CPU type shows vendor, family and model when Node Feature Discovery (NFD) is installed; otherwise architecture or cloud instance type." aria-label="Info">ⓘ</span></div>
             <div class="panel-body">
               <div class="table-wrap"><table>
                 <thead>
