@@ -46,6 +46,23 @@ function nodeCapacity($node) {
   ];
 }
 
+function formatQuantityHuman($s) {
+  if ($s === '' || $s === null) return '—';
+  $s = trim((string)$s);
+  $bytes = 0;
+  if (preg_match('/^(\d+)Ki$/i', $s, $m)) $bytes = (int)$m[1] * 1024;
+  elseif (preg_match('/^(\d+)Mi$/i', $s, $m)) $bytes = (int)$m[1] * 1024 * 1024;
+  elseif (preg_match('/^(\d+)Gi$/i', $s, $m)) $bytes = (int)$m[1] * 1024 * 1024 * 1024;
+  elseif (preg_match('/^(\d+)Ti$/i', $s, $m)) $bytes = (int)$m[1] * 1024 * 1024 * 1024 * 1024;
+  elseif (preg_match('/^(\d+)$/', $s, $m)) $bytes = (int)$m[1];
+  else return $s;
+  if ($bytes >= 1024**4) return round($bytes / 1024**4, 1) . ' Ti';
+  if ($bytes >= 1024**3) return round($bytes / 1024**3, 1) . ' Gi';
+  if ($bytes >= 1024**2) return round($bytes / 1024**2, 1) . ' Mi';
+  if ($bytes >= 1024) return round($bytes / 1024, 1) . ' Ki';
+  return $bytes . ' B';
+}
+
 function podRestarts($pod) {
   $n = 0;
   foreach ($pod['status']['containerStatuses'] ?? [] as $cs) {
@@ -278,15 +295,18 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
     .tab-pane.active { display: block; }
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
       margin-bottom: 1.5rem;
+      align-items: start;
     }
+    @media (max-width: 700px) { .summary-grid { grid-template-columns: 1fr; } }
     .summary-card {
       background: #181b1f;
       border: 1px solid #2d2d2d;
       border-radius: 8px;
-      padding: 1rem;
+      padding: 1rem 1.25rem;
+      min-width: 0;
     }
     .summary-card h3 {
       font-size: 0.75rem;
@@ -364,11 +384,11 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         </div>
         <div class="stat-card" id="stat-memory" style="display:none">
           <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span>
-          <div><div class="value" data-live="memory">—</div><div class="label">Memory (MB)</div></div>
+          <div><div class="value" data-live="memory">—</div><div class="label">Memory</div></div>
         </div>
         <div class="stat-card" id="stat-storage" style="display:none">
           <span class="icon-wrap" style="color:#9d9d9d"><svg><use href="#icon-drive"/></svg></span>
-          <div><div class="value" data-live="storage">—</div><div class="label">Storage (MB)</div></div>
+          <div><div class="value" data-live="storage">—</div><div class="label">Storage</div></div>
         </div>
       </div>
 
@@ -420,7 +440,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
               <div class="panel-header" style="border-bottom:0;padding:0 0 0.5rem 0">
                 <span class="icon-wrap" style="color:#5794f2"><svg><use href="#icon-mem"/></svg></span> Top Memory (pods)
               </div>
-              <div class="table-wrap"><table><thead><tr><th>Pod</th><th>Namespace</th><th>MB</th></tr></thead><tbody id="top-memory-tbody"></tbody></table></div>
+              <div class="table-wrap"><table><thead><tr><th>Pod</th><th>Namespace</th><th>Memory</th></tr></thead><tbody id="top-memory-tbody"></tbody></table></div>
             </div>
           </div>
         </div>
@@ -433,7 +453,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         <div class="panel-body" style="padding:1rem">
           <div id="storage-content">
             <p class="storage-note">Ephemeral storage usage (when reported by metrics-server). Disk read/write speed requires Prometheus and node_exporter.</p>
-            <div class="table-wrap"><table id="storage-table" style="display:none"><thead><tr><th>Pod</th><th>Namespace</th><th>MB</th></tr></thead><tbody id="top-storage-tbody"></tbody></table></div>
+            <div class="table-wrap"><table id="storage-table" style="display:none"><thead><tr><th>Pod</th><th>Namespace</th><th>Storage</th></tr></thead><tbody id="top-storage-tbody"></tbody></table></div>
           </div>
         </div>
       </div>
@@ -464,7 +484,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
                     </span>
                   </td>
                   <td><?php echo htmlspecialchars($cap['cpu']); ?></td>
-                  <td><?php echo htmlspecialchars($cap['memory']); ?></td>
+                  <td><?php echo htmlspecialchars(formatQuantityHuman($cap['memory'])); ?></td>
                   <td><?php echo htmlspecialchars(($n['status']['nodeInfo']['osImage'] ?? '—') . ' / ' . ($n['status']['nodeInfo']['kubeletVersion'] ?? '—')); ?></td>
                 </tr>
               <?php endforeach; ?>
@@ -546,6 +566,15 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
     initTabs();
 
     function escapeHtml(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function formatSizeMb(mb) {
+      if (mb == null || !isFinite(mb)) return '—';
+      var bytes = mb * 1e6;
+      if (bytes >= 1024*1024*1024*1024) return (bytes/(1024*1024*1024*1024)).toFixed(1) + ' Ti';
+      if (bytes >= 1024*1024*1024) return (bytes/(1024*1024*1024)).toFixed(1) + ' Gi';
+      if (bytes >= 1024*1024) return (bytes/(1024*1024)).toFixed(1) + ' Mi';
+      if (bytes >= 1024) return (bytes/1024).toFixed(1) + ' Ki';
+      return bytes + ' B';
+    }
     function updateStats(data) {
       var msgEl = document.getElementById('metrics-message');
       if (msgEl) {
@@ -568,12 +597,12 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
       if (data.memory != null) {
         var memEl = document.querySelector('[data-live="memory"]');
         var memCard = document.getElementById('stat-memory');
-        if (memEl && memCard) { memEl.textContent = data.memory; memCard.style.display = ''; }
+        if (memEl && memCard) { memEl.textContent = formatSizeMb(data.memory); memCard.style.display = ''; }
       }
       if (data.storage_mb != null) {
         var stEl = document.querySelector('[data-live="storage"]');
         var stCard = document.getElementById('stat-storage');
-        if (stEl && stCard) { stEl.textContent = data.storage_mb; stCard.style.display = ''; }
+        if (stEl && stCard) { stEl.textContent = formatSizeMb(data.storage_mb); stCard.style.display = ''; }
       }
       var topCpu = data.top_cpu_pods || [];
       var topMem = data.top_memory_pods || [];
@@ -604,7 +633,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
         if (memTbody) memTbody.innerHTML = topMem.slice(0, 10).map(function(p) {
           var pct = maxMem > 0 ? Math.min(1, p.memory_mb / maxMem) : 0;
           var color = heatColor(pct);
-          return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + p.memory_mb + '</span></span></td></tr>';
+          return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td class="cell-bar"><span class="bar-wrap"><span class="bar-fill" style="width:' + (pct * 100) + '%;background:' + color + '"></span><span class="bar-value">' + formatSizeMb(p.memory_mb) + '</span></span></td></tr>';
         }).join('');
       }
       var topStorage = data.top_storage_pods || [];
@@ -612,7 +641,7 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
       var storageTbody = document.getElementById('top-storage-tbody');
       if (topStorage.length && storageTable && storageTbody) {
         storageTable.style.display = '';
-        storageTbody.innerHTML = topStorage.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + p.storage_mb + '</td></tr>'; }).join('');
+        storageTbody.innerHTML = topStorage.slice(0, 10).map(function(p) { return '<tr><td class="mono">' + escapeHtml(p.name) + '</td><td class="mono">' + escapeHtml(p.namespace) + '</td><td>' + formatSizeMb(p.storage_mb) + '</td></tr>'; }).join('');
       }
     }
 
