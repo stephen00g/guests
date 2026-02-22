@@ -89,8 +89,11 @@ data:
         if ($vendorReadable !== '') $parts[] = $vendorReadable;
         if ($family !== '' && $family !== '6') $parts[] = 'Family ' . $family;
         if ($modelId !== '') {
-          $codename = ($vendor === 'GenuineIntel' && $family === '6' && isset($intelFamily6Model[(int)$modelId]))
-            ? $intelFamily6Model[(int)$modelId] : null;
+          $mid = (int)$modelId;
+          $fam = trim((string)$family);
+          $ven = trim((string)$vendor);
+          $isIntelF6 = ($fam === '6' || $fam === '') && (strcasecmp($ven, 'GenuineIntel') === 0 || stripos($ven, 'intel') !== false);
+          $codename = ($isIntelF6 && isset($intelFamily6Model[$mid])) ? $intelFamily6Model[$mid] : null;
           $parts[] = 'Model ' . $modelId . ($codename !== null ? ' (' . $codename . ')' : '');
         } elseif ($family !== '') {
           $parts[] = 'Family ' . $family;
