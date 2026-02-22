@@ -73,6 +73,14 @@ data:
       $labels = $node['metadata']['labels'] ?? [];
       if (!empty($labels['node.kubernetes.io/instance-type'])) return $labels['node.kubernetes.io/instance-type'];
       if (!empty($labels['beta.kubernetes.io/instance-type'])) return $labels['beta.kubernetes.io/instance-type'];
+      $vendor = $labels['feature.node.kubernetes.io/cpu-model.vendor_id'] ?? '';
+      $family = $labels['feature.node.kubernetes.io/cpu-model.family'] ?? '';
+      $modelId = $labels['feature.node.kubernetes.io/cpu-model.id'] ?? '';
+      $parts = [];
+      if ($vendor !== '') $parts[] = $vendor;
+      if ($family !== '') $parts[] = 'family ' . $family;
+      if ($modelId !== '') $parts[] = 'model ' . $modelId;
+      if (!empty($parts)) return implode(' · ', $parts);
       foreach ($labels as $key => $val) {
         if (strpos($key, 'feature.node.kubernetes.io/cpu-model') === 0 && $val !== '') return $val;
       }
@@ -247,6 +255,33 @@ data:
         .stat-card .value { font-size: 1.5rem; font-weight: 600; color: #5794f2; }
         .stat-card .label { color: #9d9d9d; font-size: 0.75rem; margin-top: 0.25rem; }
         .live-indicator { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; color: #73bf69; margin-left: auto; }
+        .version-badge { font-size: 0.7rem; color: #6d6d6d; }
+        .update-banner {
+          position: fixed;
+          bottom: 1rem;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #252526;
+          border: 1px solid #5794f2;
+          color: #e0e0e0;
+          padding: 0.75rem 1.25rem;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+          z-index: 1000;
+        }
+        .update-banner button {
+          background: #5794f2;
+          color: #fff;
+          border: none;
+          padding: 0.4rem 0.9rem;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: 500;
+        }
+        .update-banner button:hover { background: #6ba3ff; }
         .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #73bf69; animation: pulse 1.5s ease-in-out infinite; }
         @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
         .chart-wrap { position: relative; height: 220px; min-height: 180px; border-radius: 8px; overflow: hidden; }
@@ -367,6 +402,11 @@ data:
         <h1>Cluster Dashboard</h1>
         <span class="badge">Kubernetes</span>
         <span class="live-indicator" id="live-indicator"><span class="live-dot"></span> Live</span>
+        <span class="version-badge" id="version-badge" title="Dashboard version">—</span>
+      </div>
+      <div class="update-banner" id="update-banner" style="display:none" role="alert">
+        <span>New version available.</span>
+        <button type="button" id="reload-btn">Reload</button>
       </div>
       <div class="container">
         <?php if ($error): ?>
@@ -745,6 +785,24 @@ data:
     
         poll();
         setInterval(poll, pollInterval);
+    
+        var currentVersion = null;
+        var versionCheckInterval = 45000;
+        function setVersion(v) {
+          currentVersion = v;
+          var el = document.getElementById('version-badge');
+          if (el) el.textContent = v !== '—' ? 'v ' + v : '';
+        }
+        function checkVersion() {
+          fetch('version.php').then(function(r) { return r.json(); }).then(function(d) {
+            var v = d && d.version ? d.version : '—';
+            if (currentVersion === null) setVersion(v);
+            else if (v !== '—' && v !== currentVersion) document.getElementById('update-banner').style.display = 'flex';
+          }).catch(function() {});
+        }
+        checkVersion();
+        setInterval(checkVersion, versionCheckInterval);
+        document.getElementById('reload-btn').addEventListener('click', function() { location.reload(); });
       })();
       </script>
       <?php endif; ?>
@@ -929,3 +987,12 @@ data:
     
     $out['history'] = $history;
     echo json_encode($out);
+  version.php: |
+    <?php
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    $v = '—';
+    if (file_exists(__DIR__ . '/VERSION')) {
+      $v = trim((string)file_get_contents(__DIR__ . '/VERSION'));
+    }
+    echo json_encode(['version' => $v]);

@@ -14,22 +14,38 @@ spec:
         app: nginx-demo
     spec:
       serviceAccountName: nginx-demo
+      initContainers:
+        - name: copy-dashboard
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              cp -a /mnt/source/. /var/www/html/
+              echo "$(date -Iseconds)" > /var/www/html/VERSION
+          volumeMounts:
+            - name: dashboard-source
+              mountPath: /mnt/source
+              readOnly: true
+            - name: html
+              mountPath: /var/www/html
       containers:
         - name: php
           image: php:8.2-apache
           ports:
             - containerPort: 80
           volumeMounts:
-            - name: welcome-page
+            - name: html
               mountPath: /var/www/html
-              readOnly: true
             - name: sa-token
               mountPath: /var/run/secrets/kubernetes.io/serviceaccount
               readOnly: true
       volumes:
-        - name: welcome-page
+        - name: dashboard-source
           configMap:
             name: nginx-demo-welcome
+        - name: html
+          emptyDir: {}
         # Explicit token mount (required on Kubernetes 1.24+ where legacy SA token is not auto-mounted)
         - name: sa-token
           projected:
