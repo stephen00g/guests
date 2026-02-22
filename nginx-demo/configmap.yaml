@@ -323,8 +323,7 @@ data:
         }
         .summary-card .row { display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 0.35rem; font-size: 0.9rem; }
         .summary-card .row .v { color: #e0e0e0; font-variant-numeric: tabular-nums; }
-        .namespace-list { max-height: 200px; overflow-y: auto; }
-        .namespace-list .row { padding: 0.35rem 0; border-bottom: 1px solid #252526; }
+        .namespace-list .row { padding: 0.5rem 0; border-bottom: 1px solid #252526; }
         .namespace-list .row:last-child { border-bottom: 0; }
         .metrics-message {
           background: rgba(224, 176, 0, 0.1);
