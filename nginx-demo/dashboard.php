@@ -63,6 +63,17 @@ function formatQuantityHuman($s) {
   return $bytes . ' B';
 }
 
+function nodeCpuType($node) {
+  $labels = $node['metadata']['labels'] ?? [];
+  if (!empty($labels['node.kubernetes.io/instance-type'])) return $labels['node.kubernetes.io/instance-type'];
+  if (!empty($labels['beta.kubernetes.io/instance-type'])) return $labels['beta.kubernetes.io/instance-type'];
+  foreach ($labels as $key => $val) {
+    if (strpos($key, 'feature.node.kubernetes.io/cpu-model') === 0 && $val !== '') return $val;
+  }
+  $arch = $node['status']['nodeInfo']['architecture'] ?? $labels['kubernetes.io/arch'] ?? '';
+  return $arch !== '' ? $arch : '—';
+}
+
 function podRestarts($pod) {
   $n = 0;
   foreach ($pod['status']['containerStatuses'] ?? [] as $cs) {
@@ -469,12 +480,13 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
                 <th>Status</th>
                 <th>CPU</th>
                 <th>Memory</th>
+                <th>CPU type</th>
                 <th>OS / Kubelet</th>
               </tr>
             </thead>
             <tbody>
               <?php foreach ($nodes as $n): ?>
-                <?php $ready = nodeReady($n); $cap = nodeCapacity($n); ?>
+                <?php $ready = nodeReady($n); $cap = nodeCapacity($n); $cpuType = nodeCpuType($n); ?>
                 <tr>
                   <td class="mono"><?php echo htmlspecialchars($n['metadata']['name'] ?? '—'); ?></td>
                   <td>
@@ -484,11 +496,12 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
                   </td>
                   <td><?php echo htmlspecialchars($cap['cpu']); ?></td>
                   <td><?php echo htmlspecialchars(formatQuantityHuman($cap['memory'])); ?></td>
+                  <td class="mono"><?php echo htmlspecialchars($cpuType); ?></td>
                   <td><?php echo htmlspecialchars(($n['status']['nodeInfo']['osImage'] ?? '—') . ' / ' . ($n['status']['nodeInfo']['kubeletVersion'] ?? '—')); ?></td>
                 </tr>
               <?php endforeach; ?>
               <?php if (empty($nodes)): ?>
-                <tr><td colspan="5" style="color:#9d9d9d">No nodes</td></tr>
+                <tr><td colspan="6" style="color:#9d9d9d">No nodes</td></tr>
               <?php endif; ?>
             </tbody>
           </table></div>
