@@ -817,7 +817,8 @@ $nsCounts = !$error ? namespacesFromPods($pods) : [];
       if (el) el.textContent = v ? 'v ' + v : '';
     }
     function checkVersion() {
-      fetch('version.php').then(function(r) { return r.json(); }).then(function(d) {
+      var url = 'version.php?t=' + (currentVersion === null ? Date.now() : Math.floor(Date.now() / versionCheckInterval));
+      fetch(url).then(function(r) { return r.json(); }).then(function(d) {
         var v = d && d.version ? d.version : '—';
         if (currentVersion === null) setVersion(v);
         else if (v !== '—' && v !== currentVersion) document.getElementById('update-banner').style.display = 'flex';
