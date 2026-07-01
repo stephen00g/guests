@@ -16,6 +16,8 @@ spec:
         # Bump this when you update the ConfigMap to force new pods to copy new files
         dashboard/configmap-version: "2"
     spec:
+      nodeSelector:
+        node-role.kubernetes.io/compute: "true"
       serviceAccountName: nginx-demo
       initContainers:
         - name: copy-dashboard
